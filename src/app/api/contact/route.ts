@@ -10,44 +10,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Send email notification to Raquel
+    const smtpPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+    if (!smtpPass) {
+      console.error("No SMTP password configured (GMAIL_APP_PASSWORD or SMTP_PASS)");
+      return NextResponse.json({ error: "Email service not configured" }, { status: 500 });
+    }
+
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: Number(process.env.SMTP_PORT) || 587,
+      host: "smtp.gmail.com",
+      port: 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: process.env.SMTP_USER || "hassan@hsdcreative.com",
+        pass: smtpPass,
       },
     });
 
     const emailBody = `
-🏡 New Lead from RaquelSellsHomes.com
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🏡  NEW LEAD — raquelsellshomes.com
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Name: ${firstName} ${lastName}
-Email: ${email}
-Phone: ${phone || "Not provided"}
-Interest: ${interest || "Not specified"}
+Name:               ${firstName} ${lastName}
+Email:              ${email}
+Phone:              ${phone || "Not provided"}
+Interest:           ${interest || "Not specified"}
 Preferred Language: ${preferredLanguage || "Not specified"}
 
-Message:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MESSAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${message || "No message provided"}
 
----
-This lead was submitted via raquelsellshomes.com contact form.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Submitted: ${new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })} CT
 Follow up within 1 hour for best results.
     `.trim();
 
-    // Only send email if SMTP is configured
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      await transporter.sendMail({
-        from: `"RaquelSellsHomes.com" <${process.env.SMTP_USER}>`,
-        to: "raquel.moran@bairdwarner.com",
-        cc: process.env.CC_EMAIL || undefined,
-        subject: `🏡 New Lead — ${firstName} ${lastName} — ${interest || "General Inquiry"}`,
-        text: emailBody,
-      });
-    }
+    await transporter.sendMail({
+      from: `"Raquel Sells Homes" <hassan@hsdcreative.com>`,
+      to: "raquel.moran@bairdwarner.com, alessa.phi@ez-digitalsolutions.com",
+      replyTo: email,
+      subject: `New Lead — ${firstName} ${lastName} | raquelsellshomes.com`,
+      text: emailBody,
+    });
 
     // Append to Google Sheet if configured
     if (process.env.GOOGLE_SHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -81,7 +89,6 @@ Follow up within 1 hour for best results.
         });
       } catch (sheetErr) {
         console.error("Google Sheets error:", sheetErr);
-        // Don't fail the request if sheet append fails
       }
     }
 
